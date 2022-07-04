@@ -7,7 +7,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "rollup --config",
-    "review": "http-server -0 ./index.html"
+    "preview": "http-server -o ./index.html"
   },
   "keywords": [],
   "author": "",
