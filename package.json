@@ -1,0 +1,25 @@
+{
+  "name": "facile-astar",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/facile-astar.cjs.js",
+  "module": "dist/facile-astar.esm.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "rollup --config",
+    "review": "http-server -0 ./index.html"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^22.0.1",
+    "@rollup/plugin-json": "^4.1.0",
+    "@rollup/plugin-node-resolve": "^13.3.0",
+    "http-server": "^14.1.1",
+    "rollup": "^2.75.7",
+    "rollup-plugin-dts": "^4.2.2",
+    "rollup-plugin-terser": "^7.0.2",
+    "rollup-plugin-typescript2": "^0.32.1"
+  }
+}
