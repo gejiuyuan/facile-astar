@@ -8,7 +8,7 @@ class Vector2 {
         this.y = y;
         keyBufferAsFloat64[0] = x;
         keyBufferAsFloat64[1] = y;
-        this._hashed = keyBufferAsInt32[0] ^ keyBufferAsInt32[1] * keyBufferAsInt32[2] ^ keyBufferAsInt32[3];
+        this._hashed = keyBufferAsInt32[0] ^ keyBufferAsInt32[1] ^ keyBufferAsInt32[2] ^ keyBufferAsInt32[3];
     }
     get hashCode() {
         return this._hashed;
@@ -214,7 +214,7 @@ class RoutePointNode extends Vector2 {
         return (node.x === mayBeParent.x || node.y === mayBeParent.y ? 10 : 14) + mayBeParent.G;
     }
     static calcH(start, end) {
-        return (Math.abs(start.x - end.y) + Math.abs(start.y - end.y)) * 10;
+        return (Math.abs(start.x - end.x) + Math.abs(start.y - end.y)) * 10;
     }
     getAround(space, routeType) {
         const bbox = new BBox2Factory().extend2(this).extend5(space).build();

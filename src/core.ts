@@ -31,7 +31,7 @@ export class RoutePointNode extends Vector2 {
   }
 
   static calcH(start: RoutePointNode, end: RoutePointNode) {
-    return (Math.abs(start.x - end.y) + Math.abs(start.y - end.y)) * 10;
+    return (Math.abs(start.x - end.x) + Math.abs(start.y - end.y)) * 10;
   }
 
   getAround(space: number, routeType: RouteType) {

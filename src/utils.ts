@@ -15,7 +15,7 @@ export class Vector2 {
   constructor(public x: number, public y: number) {
     keyBufferAsFloat64[0] = x;
     keyBufferAsFloat64[1] = y;
-    this._hashed = keyBufferAsInt32[0] ^ keyBufferAsInt32[1] * keyBufferAsInt32[2] ^ keyBufferAsInt32[3]
+    this._hashed = keyBufferAsInt32[0] ^ keyBufferAsInt32[1] ^ keyBufferAsInt32[2] ^ keyBufferAsInt32[3]
   }
 
   dot(vec: Vector2) {
