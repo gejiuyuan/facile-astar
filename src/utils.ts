@@ -222,6 +222,97 @@ export class BBox2Factory {
 
 }
 
+export type Comparable = {
+  equals(o: Record<string, any>): boolean;
+}
+
+export type Comparator<T> = (o1: T, o2: T) => number;
+
+export class PriorityQueue<T> {
+
+  private readonly binaryHeap = new Array<T>();
+
+  private count = 0;
+
+  constructor(private readonly comparator: Comparator<T>) { }
+
+  size() {
+    return this.count;
+  }
+
+  add(item: T) {
+    if (this.count > 0) {
+      this.siftUp(this.count, item);
+    } else {
+      this.binaryHeap[0] = item;
+    }
+    this.count++;
+  }
+
+  remove(item: T) {
+    let index = this.binaryHeap.indexOf(item);
+    if (index > -1) {
+      this.binaryHeap.splice(index, 1);
+      this.count--;
+    }
+    if (this.count < 0) {
+      this.count = 0;
+    }
+  }
+
+  poll(): T | null {
+    while (true) {
+      if (this.count > 0) {
+        this.count--;
+        const result = this.binaryHeap[0];
+        if (this.count > 0) {
+          this.siftDown(0, this.binaryHeap[this.count]);
+        }
+        return result;
+      } else {
+        return null;
+      }
+    }
+  }
+
+  siftUp(index: number, item: T) {
+    while (index > 0) {
+      const parentIndex = (index - 1) >>> 1;
+      const parent = this.binaryHeap[parentIndex];
+      if (this.comparator(item, parent) > 0) {
+        break;
+      }
+      this.binaryHeap[index] = parent;
+      index = parentIndex;
+    }
+    this.binaryHeap[index] = item;
+  }
+
+  siftDown(index: number, item: T) {
+    const half = this.count >>> 1;
+    while (index < half) {
+      let leftChildIndex = (index << 1) + 1;
+      let leftChildNode = this.binaryHeap[leftChildIndex];
+
+      const rightChildIndex = leftChildIndex + 1;
+      if (rightChildIndex < this.count) {
+        const rightChildNode = this.binaryHeap[rightChildIndex];
+        if (this.comparator(leftChildNode, rightChildNode) > 0) {
+          leftChildIndex = rightChildIndex;
+          leftChildNode = rightChildNode;
+        }
+      }
+      if (this.comparator(item, leftChildNode) <= 0) {
+        break;
+      }
+      this.binaryHeap[index] = leftChildNode;
+      index = leftChildIndex;
+    }
+    this.binaryHeap[index] = item;
+  }
+
+}
+
 export function isUndef(value: unknown): value is undefined | null {
   return value === void 0 || value === null;
 }
@@ -230,6 +321,7 @@ export function extend<T>(obj1: T, obj2: T) {
   for (const key in obj1) {
     if (isUndef(obj1[key])) {
       obj1[key] = obj2[key];
+
     }
   }
   return obj1 as Required<T>;

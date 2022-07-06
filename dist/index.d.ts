@@ -52,6 +52,22 @@ declare class BBox2Factory {
     valid(): boolean;
     build(): BBox2;
 }
+declare type Comparable = {
+    equals(o: Record<string, any>): boolean;
+};
+declare type Comparator<T> = (o1: T, o2: T) => number;
+declare class PriorityQueue<T> {
+    private readonly comparator;
+    private readonly binaryHeap;
+    private count;
+    constructor(comparator: Comparator<T>);
+    size(): number;
+    add(item: T): void;
+    remove(item: T): void;
+    poll(): T | null;
+    siftUp(index: number, item: T): void;
+    siftDown(index: number, item: T): void;
+}
 declare function isUndef(value: unknown): value is undefined | null;
 declare function extend<T>(obj1: T, obj2: T): Required<T>;
 declare const EMPTY_ARRAY: any[];
@@ -62,6 +78,7 @@ declare class RoutePointNode extends Vector2 {
     get F(): number;
     G: number;
     H: number;
+    modCount: number;
     constructor(x: number, y: number);
     updateG(newG?: number): void;
     updateH(end: RoutePointNode): void;
@@ -83,8 +100,9 @@ declare type SearchOption = {
     boundaryArea?: BBox2;
 };
 declare class AStar implements SearchOption {
-    private openList;
-    private closeList;
+    private readonly queue;
+    private readonly openList;
+    private readonly closeList;
     canSearch: boolean;
     start: SearchOption['start'];
     end: SearchOption['end'];
@@ -95,9 +113,11 @@ declare class AStar implements SearchOption {
     constructor(option: SearchOption);
     private _runOne;
     search(): any[] | undefined;
+    private notFoundPointNode;
+    private foundPointNode;
     getResult(point: RoutePointNode): RoutePointNode[];
-    getMinFNodeInOpenList(): RoutePointNode;
+    getMinFNodeInOpenList(): RoutePointNode | null;
     canReach(point: RoutePointNode): boolean;
 }
 
-export { AStar, Angle, BBox2, BBox2Factory, EMPTY_ARRAY, RoutePointNode, RouteType, SearchOption, Vector2, extend, isUndef };
+export { AStar, Angle, BBox2, BBox2Factory, Comparable, Comparator, EMPTY_ARRAY, PriorityQueue, RoutePointNode, RouteType, SearchOption, Vector2, extend, isUndef };

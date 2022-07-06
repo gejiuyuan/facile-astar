@@ -179,6 +179,83 @@ class BBox2Factory {
         return new BBox2(this.minX, this.maxX, this.minY, this.maxY);
     }
 }
+class PriorityQueue {
+    constructor(comparator) {
+        this.comparator = comparator;
+        this.binaryHeap = new Array();
+        this.count = 0;
+    }
+    size() {
+        return this.count;
+    }
+    add(item) {
+        if (this.count > 0) {
+            this.siftUp(this.count, item);
+        }
+        else {
+            this.binaryHeap[0] = item;
+        }
+        this.count++;
+    }
+    remove(item) {
+        let index = this.binaryHeap.indexOf(item);
+        if (index > -1) {
+            this.binaryHeap.splice(index, 1);
+            this.count--;
+        }
+        if (this.count < 0) {
+            this.count = 0;
+        }
+    }
+    poll() {
+        while (true) {
+            if (this.count > 0) {
+                this.count--;
+                const result = this.binaryHeap[0];
+                if (this.count > 0) {
+                    this.siftDown(0, this.binaryHeap[this.count]);
+                }
+                return result;
+            }
+            else {
+                return null;
+            }
+        }
+    }
+    siftUp(index, item) {
+        while (index > 0) {
+            const parentIndex = (index - 1) >>> 1;
+            const parent = this.binaryHeap[parentIndex];
+            if (this.comparator(item, parent) > 0) {
+                break;
+            }
+            this.binaryHeap[index] = parent;
+            index = parentIndex;
+        }
+        this.binaryHeap[index] = item;
+    }
+    siftDown(index, item) {
+        const half = this.count >>> 1;
+        while (index < half) {
+            let leftChildIndex = (index << 1) + 1;
+            let leftChildNode = this.binaryHeap[leftChildIndex];
+            const rightChildIndex = leftChildIndex + 1;
+            if (rightChildIndex < this.count) {
+                const rightChildNode = this.binaryHeap[rightChildIndex];
+                if (this.comparator(leftChildNode, rightChildNode) > 0) {
+                    leftChildIndex = rightChildIndex;
+                    leftChildNode = rightChildNode;
+                }
+            }
+            if (this.comparator(item, leftChildNode) <= 0) {
+                break;
+            }
+            this.binaryHeap[index] = leftChildNode;
+            index = leftChildIndex;
+        }
+        this.binaryHeap[index] = item;
+    }
+}
 function isUndef(value) {
     return value === void 0 || value === null;
 }
@@ -192,12 +269,25 @@ function extend(obj1, obj2) {
 }
 const EMPTY_ARRAY = Object.freeze(new Array());
 
+class QueuePointNode {
+    constructor(node) {
+        this.node = node;
+        this.modCount = node.modCount;
+    }
+    noChanged() {
+        return this.modCount === this.node.modCount;
+    }
+    static comparator(n1, n2) {
+        return n1.node.F - n2.node.F;
+    }
+}
 class RoutePointNode extends Vector2 {
     constructor(x, y) {
         super(x, y);
         this.parent = null;
         this.G = 0;
         this.H = 0;
+        this.modCount = 0;
         this.key = `${x}|${y}`;
     }
     get F() {
@@ -253,6 +343,7 @@ const defaultSearchOption = {
 };
 class AStar {
     constructor(option) {
+        this.queue = new PriorityQueue(QueuePointNode.comparator);
         this.openList = new Map();
         this.closeList = new Map();
         this.canSearch = true;
@@ -281,8 +372,8 @@ class AStar {
         const aroundPoints = pointNode.getAround(step, routeType).filter(node => this.canReach(node));
         for (let i = 0; i < aroundPoints.length; i++) {
             const pointDriving = aroundPoints[i];
-            const distance = pointDriving.distance1(end);
-            if (distance < step) {
+            const distance = pointDriving.distance2(end);
+            if (distance < step ** 2) {
                 pointDriving.parent = pointNode;
                 if (distance === 0) {
                     return pointDriving;
@@ -291,18 +382,10 @@ class AStar {
                 return end;
             }
             if (!openList.has(pointDriving.key)) {
-                openList.set(pointDriving.key, pointDriving);
-                pointDriving.parent = pointNode;
-                pointDriving.updateG();
-                pointDriving.updateH(end);
+                this.notFoundPointNode(pointNode, pointDriving);
             }
             else {
-                const oldG = pointDriving.G;
-                const newG = RoutePointNode.calcG(pointDriving, pointNode);
-                if (newG < oldG) {
-                    pointDriving.parent = pointNode;
-                    pointDriving.updateG(newG);
-                }
+                this.foundPointNode(pointNode, pointDriving);
             }
         }
         openList.delete(pointNode.key);
@@ -312,15 +395,36 @@ class AStar {
         if (!this.canSearch) {
             return EMPTY_ARRAY;
         }
-        const { openList } = this;
+        const { openList, queue } = this;
         openList.set(this.start.key, this.start);
+        queue.add(new QueuePointNode(this.start));
         do {
             const minFNode = this.getMinFNodeInOpenList();
-            const endRoutePointNode = this._runOne(minFNode);
-            if (endRoutePointNode) {
-                return this.getResult(endRoutePointNode);
+            if (minFNode) {
+                const endRoutePointNode = this._runOne(minFNode);
+                if (endRoutePointNode) {
+                    return this.getResult(endRoutePointNode);
+                }
             }
         } while (openList.size);
+    }
+    notFoundPointNode(currentNode, nextNode) {
+        nextNode.parent = currentNode;
+        nextNode.updateG();
+        nextNode.updateH(this.end);
+        nextNode.modCount++;
+        this.openList.set(nextNode.key, nextNode);
+        this.queue.add(new QueuePointNode(nextNode));
+    }
+    foundPointNode(currentNode, nextNode) {
+        const oldG = nextNode.G;
+        const newG = RoutePointNode.calcG(nextNode, currentNode);
+        if (newG < oldG) {
+            nextNode.parent = currentNode;
+            nextNode.updateG(newG);
+            nextNode.modCount++;
+            this.queue.add(new QueuePointNode(nextNode));
+        }
     }
     getResult(point) {
         const trackPoints = [point];
@@ -330,13 +434,15 @@ class AStar {
         return trackPoints.reverse();
     }
     getMinFNodeInOpenList() {
-        let minFNode;
-        for (const [, node] of this.openList) {
-            if (minFNode === void 0 || node.F < minFNode.F) {
-                minFNode = node;
+        while (true) {
+            const node = this.queue.poll();
+            if (node === null) {
+                return null;
+            }
+            else if (node.noChanged()) {
+                return node.node;
             }
         }
-        return minFNode;
     }
     canReach(point) {
         if (this.closeList.has(point.key)) {
@@ -352,4 +458,4 @@ class AStar {
     }
 }
 
-export { AStar, Angle, BBox2, BBox2Factory, EMPTY_ARRAY, RoutePointNode, RouteType, Vector2, extend, isUndef };
+export { AStar, Angle, BBox2, BBox2Factory, EMPTY_ARRAY, PriorityQueue, RoutePointNode, RouteType, Vector2, extend, isUndef };

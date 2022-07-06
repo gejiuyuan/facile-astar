@@ -1,4 +1,25 @@
-import { BBox2, BBox2Factory, EMPTY_ARRAY, extend, Vector2 } from "./utils";
+import { BBox2, BBox2Factory, EMPTY_ARRAY, extend, PriorityQueue, Vector2 } from "./utils";
+
+class QueuePointNode {
+
+  readonly node: RoutePointNode;
+
+  readonly modCount: number;
+
+  constructor(node: RoutePointNode) {
+    this.node = node;
+    this.modCount = node.modCount;
+  }
+
+  noChanged() {
+    return this.modCount === this.node.modCount;
+  }
+
+  static comparator(n1: QueuePointNode, n2: QueuePointNode) {
+    return n1.node.F - n2.node.F;
+  }
+
+}
 
 export class RoutePointNode extends Vector2 {
   key!: string;
@@ -12,6 +33,8 @@ export class RoutePointNode extends Vector2 {
   G: number = 0;
 
   H: number = 0;
+
+  modCount: number = 0;
 
   constructor(x: number, y: number) {
     super(x, y);
@@ -85,9 +108,12 @@ const defaultSearchOption: Partial<SearchOption> = {
 }
 
 export class AStar implements SearchOption {
-  private openList = new Map<string, RoutePointNode>();
 
-  private closeList = new Map<string, RoutePointNode>();
+  private readonly queue = new PriorityQueue<QueuePointNode>(QueuePointNode.comparator);
+
+  private readonly openList = new Map<string, RoutePointNode>();
+
+  private readonly closeList = new Map<string, RoutePointNode>();
 
   canSearch = true;
 
@@ -135,8 +161,8 @@ export class AStar implements SearchOption {
     const aroundPoints = pointNode.getAround(step, routeType).filter(node => this.canReach(node));
     for (let i = 0; i < aroundPoints.length; i++) {
       const pointDriving = aroundPoints[i];
-      const distance = pointDriving.distance1(end);
-      if (distance < step) {
+      const distance = pointDriving.distance2(end);
+      if (distance < step ** 2) {
         pointDriving.parent = pointNode;
         if (distance === 0) {
           return pointDriving;
@@ -145,36 +171,53 @@ export class AStar implements SearchOption {
         return end;
       }
       if (!openList.has(pointDriving.key)) {
-        openList.set(pointDriving.key, pointDriving);
-        pointDriving.parent = pointNode;
-        pointDriving.updateG();
-        pointDriving.updateH(end);
+        this.notFoundPointNode(pointNode, pointDriving)
       } else {
-        const oldG = pointDriving.G;
-        const newG = RoutePointNode.calcG(pointDriving, pointNode);
-        if (newG < oldG) {
-          pointDriving.parent = pointNode;
-          pointDriving.updateG(newG);
-        }
+        this.foundPointNode(pointNode, pointDriving);
       }
     }
     openList.delete(pointNode.key);
     this.closeList.set(pointNode.key, pointNode);
   }
 
+
   search() {
     if (!this.canSearch) {
       return EMPTY_ARRAY
     }
-    const { openList } = this;
+    const { openList, queue } = this;
     openList.set(this.start.key, this.start);
+    queue.add(new QueuePointNode(this.start));
+
     do {
       const minFNode = this.getMinFNodeInOpenList();
-      const endRoutePointNode = this._runOne(minFNode);
-      if (endRoutePointNode) {
-        return this.getResult(endRoutePointNode);
+      if (minFNode) {
+        const endRoutePointNode = this._runOne(minFNode);
+        if (endRoutePointNode) {
+          return this.getResult(endRoutePointNode);
+        }
       }
     } while (openList.size);
+  }
+
+  private notFoundPointNode(currentNode: RoutePointNode, nextNode: RoutePointNode) {
+    nextNode.parent = currentNode;
+    nextNode.updateG();
+    nextNode.updateH(this.end);
+    nextNode.modCount++;
+    this.openList.set(nextNode.key, nextNode);
+    this.queue.add(new QueuePointNode(nextNode));
+  }
+
+  private foundPointNode(currentNode: RoutePointNode, nextNode: RoutePointNode) {
+    const oldG = nextNode.G;
+    const newG = RoutePointNode.calcG(nextNode, currentNode);
+    if (newG < oldG) {
+      nextNode.parent = currentNode;
+      nextNode.updateG(newG);
+      nextNode.modCount++;
+      this.queue.add(new QueuePointNode(nextNode));
+    }
   }
 
   getResult(point: RoutePointNode) {
@@ -186,13 +229,14 @@ export class AStar implements SearchOption {
   }
 
   getMinFNodeInOpenList() {
-    let minFNode!: RoutePointNode;
-    for (const [, node] of this.openList) {
-      if (minFNode === void 0 || node.F < minFNode.F) {
-        minFNode = node;
+    while (true) {
+      const node = this.queue.poll();
+      if (node === null) {
+        return null;
+      } else if (node.noChanged()) {
+        return node.node;
       }
     }
-    return minFNode;
   }
 
   canReach(point: RoutePointNode) {
