@@ -82,6 +82,7 @@
       new BBox2(500, 660, 220, 360),
       new BBox2(880, 1200, 400, 650),
       new BBox2(700, 780, 440, 560),
+      new BBox2(940, 1080, 260, 360),
     ]
 
     const startPl = syncPolylineAttr({
@@ -104,13 +105,16 @@
 
     document.getElementById('search-btn').addEventListener('click', () => {
       console.time('寻路时长')
-      const res = new AStar({
+      const tool =  new AStar({
         start,
         end,
         blockArea,
+        // option: orthometric、diagonal、all
         routeType: 'orthometric',
         step: 40,
-      }).search();
+      });
+      window.tool = tool;
+      const res = tool.search();
       console.timeEnd('寻路时长')
       
       const className = 'searched-track';

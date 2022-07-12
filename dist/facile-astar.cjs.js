@@ -183,81 +183,164 @@ class BBox2Factory {
         return new BBox2(this.minX, this.maxX, this.minY, this.maxY);
     }
 }
-class PriorityQueue {
-    constructor(comparator) {
-        this.comparator = comparator;
-        this.binaryHeap = new Array();
-        this.count = 0;
+class DoublyLinkedListNode {
+    constructor(value) {
+        this.value = value;
+        this.previous = null;
+        this.next = null;
     }
-    size() {
-        return this.count;
+}
+class DoublyLinkedList {
+    constructor() {
+        this.head = null;
+        this.tail = null;
     }
-    add(item) {
-        if (this.count > 0) {
-            this.siftUp(this.count, item);
+    insertBefore(node, value) {
+        const newNode = new DoublyLinkedListNode(value);
+        if (node === null) {
+            if (this.head === node) {
+                this.head = newNode;
+            }
+            if (this.tail === node) {
+                this.tail = newNode;
+            }
         }
         else {
-            this.binaryHeap[0] = item;
+            if (this.head === node) {
+                this.head = newNode;
+            }
+            if (newNode.previous = node.previous) {
+                newNode.previous.next = newNode;
+            }
+            newNode.next = node;
+            node.previous = newNode;
         }
-        this.count++;
+        return newNode;
     }
-    remove(item) {
-        let index = this.binaryHeap.indexOf(item);
-        if (index > -1) {
-            this.binaryHeap.splice(index, 1);
-            this.count--;
+    insertAfter(node, value) {
+        const newNode = new DoublyLinkedListNode(value);
+        if (node === null) {
+            if (this.head === node) {
+                this.head = newNode;
+            }
+            if (this.tail === node) {
+                this.tail = newNode;
+            }
         }
-        if (this.count < 0) {
-            this.count = 0;
+        else {
+            if (this.tail === node) {
+                this.tail = newNode;
+            }
+            if (newNode.next = node.next) {
+                newNode.next.previous = newNode;
+            }
+            newNode.previous = node;
+            node.next = newNode;
         }
+        return newNode;
+    }
+    shift(value) {
+        return this.insertBefore(this.head, value);
+    }
+    push(value) {
+        return this.insertAfter(this.tail, value);
+    }
+    delete(node) {
+        if (node.next === null && node.previous === null) {
+            this.head = null;
+            this.tail = null;
+            return;
+        }
+        if (node.next) {
+            if (!(node.next.previous = node.previous)) {
+                this.head = node.next;
+            }
+        }
+        if (node.previous) {
+            if (!(node.previous.next = node.next)) {
+                this.tail = node.previous;
+            }
+        }
+    }
+    toArray() {
+        const nodes = [];
+        let currentNode = this.head;
+        while (currentNode) {
+            nodes.push(currentNode);
+            currentNode = currentNode.next;
+        }
+        return nodes;
+    }
+    fromArray(array) {
+        for (let i = 0; i < array.length; i++) {
+            this.push(array[i]);
+        }
+        return this;
+    }
+    reverse() {
+        let currentNode = this.head;
+        let previousNode = null;
+        let nextNode = null;
+        while (currentNode) {
+            nextNode = currentNode.next;
+            previousNode = currentNode.previous;
+            currentNode.next = previousNode;
+            currentNode.previous = nextNode;
+            previousNode = currentNode;
+            currentNode = nextNode;
+        }
+        this.tail = this.head;
+        this.head = previousNode;
+        return this;
+    }
+}
+class PriorityQueue extends DoublyLinkedList {
+    constructor(comparator) {
+        super();
+        this.comparator = comparator;
+    }
+    insert(value) {
+        let currentNode = this.head;
+        if (!currentNode) {
+            return this.insertBefore(currentNode, value);
+        }
+        do {
+            if (this.comparator(value, currentNode.value)) {
+                return this.insertBefore(currentNode, value);
+            }
+            currentNode = currentNode.next;
+        } while (currentNode);
+        return this.insertAfter(this.tail, value);
     }
     poll() {
-        while (true) {
-            if (this.count > 0) {
-                this.count--;
-                const result = this.binaryHeap[0];
-                if (this.count > 0) {
-                    this.siftDown(0, this.binaryHeap[this.count]);
-                }
-                return result;
-            }
-            else {
-                return null;
-            }
+        let minPriorityNode = this.head;
+        if (minPriorityNode) {
+            const res = [];
+            let currentNode = minPriorityNode;
+            do {
+                res.push(currentNode.value);
+                this.delete(currentNode);
+            } while (currentNode.next && (currentNode = currentNode.next) && this.comparator(currentNode.value, minPriorityNode.value));
+            return res;
         }
+        return null;
     }
-    siftUp(index, item) {
-        while (index > 0) {
-            const parentIndex = (index - 1) >>> 1;
-            const parent = this.binaryHeap[parentIndex];
-            if (this.comparator(item, parent) > 0) {
-                break;
-            }
-            this.binaryHeap[index] = parent;
-            index = parentIndex;
-        }
-        this.binaryHeap[index] = item;
-    }
-    siftDown(index, item) {
-        const half = this.count >>> 1;
-        while (index < half) {
-            let leftChildIndex = (index << 1) + 1;
-            let leftChildNode = this.binaryHeap[leftChildIndex];
-            const rightChildIndex = leftChildIndex + 1;
-            if (rightChildIndex < this.count) {
-                const rightChildNode = this.binaryHeap[rightChildIndex];
-                if (this.comparator(leftChildNode, rightChildNode) > 0) {
-                    leftChildIndex = rightChildIndex;
-                    leftChildNode = rightChildNode;
-                }
-            }
-            if (this.comparator(item, leftChildNode) <= 0) {
-                break;
-            }
-            this.binaryHeap[index] = leftChildNode;
-            index = leftChildIndex;
-        }
-        this.binaryHeap[index] = item;
+}
+class Comparator {
+    constructor(compareFunc) {
+        this.compareFunc = compareFunc;
+        this.equal = (...args) => {
+            return this.compareFunc(...args) === 0;
+        };
+        this.lessThan = (...args) => {
+            return this.compareFunc(...args) < 0;
+        };
+        this.greaterThan = (...args) => {
+            return this.compareFunc(...args) > 0;
+        };
+        this.lessOrEqualThan = (...args) => {
+            return this.equal(...args) || this.lessThan(...args);
+        };
     }
 }
 function isUndef(value) {
@@ -281,10 +364,8 @@ class QueuePointNode {
     noChanged() {
         return this.modCount === this.node.modCount;
     }
-    static comparator(n1, n2) {
-        return n1.node.F - n2.node.F;
-    }
 }
+QueuePointNode.comparator = new Comparator((n1, n2) => n1.node.F - n2.node.F).lessOrEqualThan;
 class RoutePointNode extends Vector2 {
     constructor(x, y) {
         super(x, y);
@@ -401,13 +482,16 @@ class AStar {
         }
         const { openList, queue } = this;
         openList.set(this.start.key, this.start);
-        queue.add(new QueuePointNode(this.start));
+        this.start.updateH(this.end);
+        queue.insert(new QueuePointNode(this.start));
         do {
-            const minFNode = this.getMinFNodeInOpenList();
-            if (minFNode) {
-                const endRoutePointNode = this._runOne(minFNode);
-                if (endRoutePointNode) {
-                    return this.getResult(endRoutePointNode);
+            const minFQueueNodes = queue.poll();
+            if (minFQueueNodes) {
+                for (const queueNode of minFQueueNodes) {
+                    const endRoutePointNode = this._runOne(queueNode.node);
+                    if (endRoutePointNode) {
+                        return this.getResult(endRoutePointNode);
+                    }
                 }
             }
         } while (openList.size);
@@ -418,7 +502,7 @@ class AStar {
         nextNode.updateH(this.end);
         nextNode.modCount++;
         this.openList.set(nextNode.key, nextNode);
-        this.queue.add(new QueuePointNode(nextNode));
+        this.queue.insert(new QueuePointNode(nextNode));
     }
     foundPointNode(currentNode, nextNode) {
         const oldG = nextNode.G;
@@ -427,7 +511,7 @@ class AStar {
             nextNode.parent = currentNode;
             nextNode.updateG(newG);
             nextNode.modCount++;
-            this.queue.add(new QueuePointNode(nextNode));
+            this.queue.insert(new QueuePointNode(nextNode));
         }
     }
     getResult(point) {
@@ -436,17 +520,6 @@ class AStar {
             trackPoints.push(point = point.parent);
         }
         return trackPoints.reverse();
-    }
-    getMinFNodeInOpenList() {
-        while (true) {
-            const node = this.queue.poll();
-            if (node === null) {
-                return null;
-            }
-            else if (node.noChanged()) {
-                return node.node;
-            }
-        }
     }
     canReach(point) {
         if (this.closeList.has(point.key)) {
@@ -466,6 +539,9 @@ exports.AStar = AStar;
 exports.Angle = Angle;
 exports.BBox2 = BBox2;
 exports.BBox2Factory = BBox2Factory;
+exports.Comparator = Comparator;
+exports.DoublyLinkedList = DoublyLinkedList;
+exports.DoublyLinkedListNode = DoublyLinkedListNode;
 exports.EMPTY_ARRAY = EMPTY_ARRAY;
 exports.PriorityQueue = PriorityQueue;
 exports.RoutePointNode = RoutePointNode;

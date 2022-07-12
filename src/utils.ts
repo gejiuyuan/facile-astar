@@ -222,95 +222,185 @@ export class BBox2Factory {
 
 }
 
-export type Comparable = {
-  equals(o: Record<string, any>): boolean;
+export class DoublyLinkedListNode<T> {
+  previous: DoublyLinkedListNode<T> | null = null;
+  next: DoublyLinkedListNode<T> | null = null;
+  constructor(public value: T) { }
 }
 
-export type Comparator<T> = (o1: T, o2: T) => number;
+export class DoublyLinkedList<T> {
 
-export class PriorityQueue<T> {
+  head: DoublyLinkedListNode<T> | null = null;
 
-  private readonly binaryHeap = new Array<T>();
+  tail: DoublyLinkedListNode<T> | null = null;
 
-  private count = 0;
+  constructor() {
 
-  constructor(private readonly comparator: Comparator<T>) { }
-
-  size() {
-    return this.count;
   }
 
-  add(item: T) {
-    if (this.count > 0) {
-      this.siftUp(this.count, item);
+  insertBefore(node: DoublyLinkedListNode<T> | null, value: T) {
+    const newNode = new DoublyLinkedListNode(value);
+    if (node === null) {
+      if (this.head === node) {
+        this.head = newNode;
+      }
+      if (this.tail === node) {
+        this.tail = newNode;
+      }
     } else {
-      this.binaryHeap[0] = item;
+      if (this.head === node) {
+        this.head = newNode;
+      }
+      if (newNode.previous = node.previous) {
+        newNode.previous.next = newNode;
+      };
+      newNode.next = node;
+      node.previous = newNode;
     }
-    this.count++;
+    return newNode;
   }
 
-  remove(item: T) {
-    let index = this.binaryHeap.indexOf(item);
-    if (index > -1) {
-      this.binaryHeap.splice(index, 1);
-      this.count--;
+  insertAfter(node: DoublyLinkedListNode<T> | null, value: T) {
+    const newNode = new DoublyLinkedListNode(value);
+    if (node === null) {
+      if (this.head === node) {
+        this.head = newNode;
+      }
+      if (this.tail === node) {
+        this.tail = newNode;
+      }
+    } else {
+      if (this.tail === node) {
+        this.tail = newNode;
+      }
+      if (newNode.next = node.next) {
+        newNode.next.previous = newNode;
+      };
+      newNode.previous = node;
+      node.next = newNode;
     }
-    if (this.count < 0) {
-      this.count = 0;
-    }
+    return newNode;
   }
 
-  poll(): T | null {
-    while (true) {
-      if (this.count > 0) {
-        this.count--;
-        const result = this.binaryHeap[0];
-        if (this.count > 0) {
-          this.siftDown(0, this.binaryHeap[this.count]);
-        }
-        return result;
-      } else {
-        return null;
+  shift(value: T) {
+    return this.insertBefore(this.head, value);
+  }
+
+  push(value: T) {
+    return this.insertAfter(this.tail, value);
+  }
+
+  delete(node: DoublyLinkedListNode<T>) {
+    if (node.next === null && node.previous === null) {
+      this.head = null;
+      this.tail = null;
+      return;
+    }
+    if (node.next) {
+      if (!(node.next.previous = node.previous)) {
+        this.head = node.next;
+      }
+    }
+    if (node.previous) {
+      if (!(node.previous.next = node.next)) {
+        this.tail = node.previous;
       }
     }
   }
 
-  siftUp(index: number, item: T) {
-    while (index > 0) {
-      const parentIndex = (index - 1) >>> 1;
-      const parent = this.binaryHeap[parentIndex];
-      if (this.comparator(item, parent) > 0) {
-        break;
-      }
-      this.binaryHeap[index] = parent;
-      index = parentIndex;
+  toArray() {
+    const nodes: DoublyLinkedListNode<T>[] = []
+    let currentNode = this.head;
+    while (currentNode) {
+      nodes.push(currentNode);
+      currentNode = currentNode.next;
     }
-    this.binaryHeap[index] = item;
+    return nodes;
   }
 
-  siftDown(index: number, item: T) {
-    const half = this.count >>> 1;
-    while (index < half) {
-      let leftChildIndex = (index << 1) + 1;
-      let leftChildNode = this.binaryHeap[leftChildIndex];
-
-      const rightChildIndex = leftChildIndex + 1;
-      if (rightChildIndex < this.count) {
-        const rightChildNode = this.binaryHeap[rightChildIndex];
-        if (this.comparator(leftChildNode, rightChildNode) > 0) {
-          leftChildIndex = rightChildIndex;
-          leftChildNode = rightChildNode;
-        }
-      }
-      if (this.comparator(item, leftChildNode) <= 0) {
-        break;
-      }
-      this.binaryHeap[index] = leftChildNode;
-      index = leftChildIndex;
+  fromArray(array: T[]) {
+    for (let i = 0; i < array.length; i++) {
+      this.push(array[i]);
     }
-    this.binaryHeap[index] = item;
+    return this;
   }
 
+  reverse() {
+    let currentNode = this.head;
+    let previousNode = null;
+    let nextNode = null;
+    while (currentNode) {
+      nextNode = currentNode.next;
+      previousNode = currentNode.previous;
+
+      currentNode.next = previousNode;
+      currentNode.previous = nextNode;
+
+      previousNode = currentNode;
+      currentNode = nextNode;
+    }
+    this.tail = this.head;
+    this.head = previousNode;
+    return this;
+  }
+}
+
+export type Compute<T> = T extends Function ? T : { [k in keyof T]: T[k] }
+
+export type Item<T> = T extends { [k in keyof T]: infer V } ? V : never;
+
+export class PriorityQueue<T> extends DoublyLinkedList<T> {
+  constructor(private readonly comparator: Item<Compute<Comparator<T>>>) {
+    super();
+  }
+
+  insert(value: T) {
+    let currentNode = this.head;
+    if (!currentNode) {
+      return this.insertBefore(currentNode, value);
+    }
+    do {
+      if (this.comparator(value, currentNode.value)) {
+        return this.insertBefore(currentNode, value);
+      }
+      currentNode = currentNode.next;
+    } while (currentNode);
+    return this.insertAfter(this.tail, value);
+  }
+
+  poll() {
+    let minPriorityNode = this.head;
+    if (minPriorityNode) {
+      const res: T[] = [];
+      let currentNode = minPriorityNode;
+      do {
+        res.push(currentNode.value);
+        this.delete(currentNode);
+      } while (currentNode.next && (currentNode = currentNode.next) && this.comparator(currentNode.value, minPriorityNode.value));
+      return res;
+    }
+    return null;
+  }
+}
+
+export class Comparator<T> {
+  constructor(private readonly compareFunc: (o1: T, o2: T) => number) { }
+
+  equal = (...args: Parameters<typeof this.compareFunc>) => {
+    return this.compareFunc(...args) === 0;
+  }
+
+  lessThan = (...args: Parameters<typeof this.compareFunc>) => {
+    return this.compareFunc(...args) < 0;
+  }
+
+  greaterThan = (...args: Parameters<typeof this.compareFunc>) => {
+    return this.compareFunc(...args) > 0;
+  }
+
+  lessOrEqualThan = (...args: Parameters<typeof this.compareFunc>) => {
+    return this.equal(...args) || this.lessThan(...args);
+  }
 }
 
 export function isUndef(value: unknown): value is undefined | null {

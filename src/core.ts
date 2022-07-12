@@ -1,4 +1,4 @@
-import { BBox2, BBox2Factory, EMPTY_ARRAY, extend, PriorityQueue, Vector2 } from "./utils";
+import { BBox2, BBox2Factory, Comparator, EMPTY_ARRAY, PriorityQueue, Vector2 } from "./utils";
 
 class QueuePointNode {
 
@@ -15,9 +15,7 @@ class QueuePointNode {
     return this.modCount === this.node.modCount;
   }
 
-  static comparator(n1: QueuePointNode, n2: QueuePointNode) {
-    return n1.node.F - n2.node.F;
-  }
+  static comparator = new Comparator((n1: QueuePointNode, n2: QueuePointNode) => n1.node.F - n2.node.F).lessOrEqualThan
 
 }
 
@@ -187,14 +185,17 @@ export class AStar implements SearchOption {
     }
     const { openList, queue } = this;
     openList.set(this.start.key, this.start);
-    queue.add(new QueuePointNode(this.start));
+    this.start.updateH(this.end);
+    queue.insert(new QueuePointNode(this.start));
 
     do {
-      const minFNode = this.getMinFNodeInOpenList();
-      if (minFNode) {
-        const endRoutePointNode = this._runOne(minFNode);
-        if (endRoutePointNode) {
-          return this.getResult(endRoutePointNode);
+      const minFQueueNodes = queue.poll();
+      if (minFQueueNodes) {
+        for (const queueNode of minFQueueNodes) {
+          const endRoutePointNode = this._runOne(queueNode.node);
+          if (endRoutePointNode) {
+            return this.getResult(endRoutePointNode);
+          }
         }
       }
     } while (openList.size);
@@ -206,7 +207,7 @@ export class AStar implements SearchOption {
     nextNode.updateH(this.end);
     nextNode.modCount++;
     this.openList.set(nextNode.key, nextNode);
-    this.queue.add(new QueuePointNode(nextNode));
+    this.queue.insert(new QueuePointNode(nextNode));
   }
 
   private foundPointNode(currentNode: RoutePointNode, nextNode: RoutePointNode) {
@@ -216,7 +217,7 @@ export class AStar implements SearchOption {
       nextNode.parent = currentNode;
       nextNode.updateG(newG);
       nextNode.modCount++;
-      this.queue.add(new QueuePointNode(nextNode));
+      this.queue.insert(new QueuePointNode(nextNode));
     }
   }
 
@@ -226,17 +227,6 @@ export class AStar implements SearchOption {
       trackPoints.push(point = point.parent);
     }
     return trackPoints.reverse();
-  }
-
-  getMinFNodeInOpenList() {
-    while (true) {
-      const node = this.queue.poll();
-      if (node === null) {
-        return null;
-      } else if (node.noChanged()) {
-        return node.node;
-      }
-    }
   }
 
   canReach(point: RoutePointNode) {

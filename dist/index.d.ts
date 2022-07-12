@@ -52,21 +52,44 @@ declare class BBox2Factory {
     valid(): boolean;
     build(): BBox2;
 }
-declare type Comparable = {
-    equals(o: Record<string, any>): boolean;
+declare class DoublyLinkedListNode<T> {
+    value: T;
+    previous: DoublyLinkedListNode<T> | null;
+    next: DoublyLinkedListNode<T> | null;
+    constructor(value: T);
+}
+declare class DoublyLinkedList<T> {
+    head: DoublyLinkedListNode<T> | null;
+    tail: DoublyLinkedListNode<T> | null;
+    constructor();
+    insertBefore(node: DoublyLinkedListNode<T> | null, value: T): DoublyLinkedListNode<T>;
+    insertAfter(node: DoublyLinkedListNode<T> | null, value: T): DoublyLinkedListNode<T>;
+    shift(value: T): DoublyLinkedListNode<T>;
+    push(value: T): DoublyLinkedListNode<T>;
+    delete(node: DoublyLinkedListNode<T>): void;
+    toArray(): DoublyLinkedListNode<T>[];
+    fromArray(array: T[]): this;
+    reverse(): this;
+}
+declare type Compute<T> = T extends Function ? T : {
+    [k in keyof T]: T[k];
 };
-declare type Comparator<T> = (o1: T, o2: T) => number;
-declare class PriorityQueue<T> {
+declare type Item<T> = T extends {
+    [k in keyof T]: infer V;
+} ? V : never;
+declare class PriorityQueue<T> extends DoublyLinkedList<T> {
     private readonly comparator;
-    private readonly binaryHeap;
-    private count;
-    constructor(comparator: Comparator<T>);
-    size(): number;
-    add(item: T): void;
-    remove(item: T): void;
-    poll(): T | null;
-    siftUp(index: number, item: T): void;
-    siftDown(index: number, item: T): void;
+    constructor(comparator: Item<Compute<Comparator<T>>>);
+    insert(value: T): DoublyLinkedListNode<T>;
+    poll(): T[] | null;
+}
+declare class Comparator<T> {
+    private readonly compareFunc;
+    constructor(compareFunc: (o1: T, o2: T) => number);
+    equal: (o1: T, o2: T) => boolean;
+    lessThan: (o1: T, o2: T) => boolean;
+    greaterThan: (o1: T, o2: T) => boolean;
+    lessOrEqualThan: (o1: T, o2: T) => boolean;
 }
 declare function isUndef(value: unknown): value is undefined | null;
 declare function extend<T>(obj1: T, obj2: T): Required<T>;
@@ -116,8 +139,7 @@ declare class AStar implements SearchOption {
     private notFoundPointNode;
     private foundPointNode;
     getResult(point: RoutePointNode): RoutePointNode[];
-    getMinFNodeInOpenList(): RoutePointNode | null;
     canReach(point: RoutePointNode): boolean;
 }
 
-export { AStar, Angle, BBox2, BBox2Factory, Comparable, Comparator, EMPTY_ARRAY, PriorityQueue, RoutePointNode, RouteType, SearchOption, Vector2, extend, isUndef };
+export { AStar, Angle, BBox2, BBox2Factory, Comparator, Compute, DoublyLinkedList, DoublyLinkedListNode, EMPTY_ARRAY, Item, PriorityQueue, RoutePointNode, RouteType, SearchOption, Vector2, extend, isUndef };

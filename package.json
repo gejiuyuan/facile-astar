@@ -6,8 +6,8 @@
   "module": "dist/facile-astar.esm.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "rollup --config",
-    "preview": "http-server -o ./index.html"
+    "build": "npx tsc --noEmit && rollup --config",
+    "preview": "http-server -p 1008 -c-1 -o ./index.html"
   },
   "keywords": [],
   "author": "",
