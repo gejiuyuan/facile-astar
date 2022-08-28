@@ -73,9 +73,29 @@
     const gridRect = svg.querySelector('rect#gridBg');
     gridRect.setAttribute('width', svg.width.baseVal.value);
     gridRect.setAttribute('height', svg.height.baseVal.value);
-    
-    const start = new RoutePointNode(120, 80);
-    const end = new RoutePointNode(1440, 500);
+     
+
+    let res = [];
+    let nodes = []
+    let count = 1;
+
+    document.getElementById('root').addEventListener('click', (ev) => {
+      const {clientX, clientY} = ev;
+      const ps = new RoutePointNode(clientX, clientY);
+      if(blockArea.some(bbox => bbox.isContain(ps))) {
+        return;
+      }
+      const i = ++count & 1
+      res[i] = ps;
+      nodes[i]?.remove();
+      nodes[i] = syncPolylineAttr({
+        points: [ps,ps]
+      })
+      if(res.length === 2) {
+        document.getElementById('search-btn').click()
+      }
+    })
+
     const blockArea = [
       new BBox2(400, 680, 40, 200),
       new BBox2(260, 560, 420, 560),
@@ -84,14 +104,7 @@
       new BBox2(700, 780, 440, 560),
       new BBox2(940, 1080, 260, 360),
     ]
-
-    const startPl = syncPolylineAttr({
-      points: [start, start]
-    })
-    
-    const endPl = syncPolylineAttr({
-      points: [end, end]
-    })
+ 
 
     blockArea.forEach(bbox => {
       const rectElm = createElm('rect');
@@ -104,17 +117,20 @@
     })
 
     document.getElementById('search-btn').addEventListener('click', () => {
+      if(res.length < 2) {
+        return
+      }
       console.time('寻路时长')
       const tool =  new AStar({
-        start,
-        end,
+        start: res[0],
+        end: res[1],
         blockArea,
         // option: orthometric、diagonal、all
         routeType: 'orthometric',
         step: 40,
       });
       window.tool = tool;
-      const res = tool.search();
+      const ts = tool.search();
       console.timeEnd('寻路时长')
       
       const className = 'searched-track';
@@ -127,17 +143,16 @@
         })
       }
 
-      startPl.before(trackElm);
-      endPl.before(startPl);
-
-      let length = res.length;
-      let count = 0;
-      loopSetTrack()
-      function loopSetTrack() {
+      nodes[0].before(trackElm);
+      nodes[1].before(nodes[0]); 
+      loopSetTrack(ts.shift(), 0)
+      function loopSetTrack(arr, count) {
         setTimeout(() => {
-          trackElm.setAttribute('points', res.slice(0, count++).map(ps => [...ps].join(' ')).join(' '))
-          if(count <= length) {
-            loopSetTrack();
+          trackElm.setAttribute('points', arr.slice(0, count++).map(ps => [...ps].join(' ')).join(' '))
+          if(count <= arr.length) {
+            loopSetTrack(arr, count);
+          } else if(ts.length){
+            loopSetTrack(ts.shift(), 0)
           }
         }, 40);
       }

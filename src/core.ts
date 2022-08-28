@@ -1,23 +1,6 @@
-import { BBox2, BBox2Factory, Comparator, EMPTY_ARRAY, PriorityQueue, Vector2 } from "./utils";
+import { AbstractPriorityQueue, BBox2, BBox2Factory, Comparator, EMPTY_ARRAY, Vector2 } from "./utils";
 
-class QueuePointNode {
-
-  readonly node: RoutePointNode;
-
-  readonly modCount: number;
-
-  constructor(node: RoutePointNode) {
-    this.node = node;
-    this.modCount = node.modCount;
-  }
-
-  noChanged() {
-    return this.modCount === this.node.modCount;
-  }
-
-  static comparator = new Comparator((n1: QueuePointNode, n2: QueuePointNode) => n1.node.F - n2.node.F).lessOrEqualThan
-
-}
+const comparator = new Comparator((n1: RoutePointNode, n2: RoutePointNode) => n1.F - n2.F).lessOrEqualThan
 
 export class RoutePointNode extends Vector2 {
   key!: string;
@@ -31,8 +14,6 @@ export class RoutePointNode extends Vector2 {
   G: number = 0;
 
   H: number = 0;
-
-  modCount: number = 0;
 
   constructor(x: number, y: number) {
     super(x, y);
@@ -52,35 +33,7 @@ export class RoutePointNode extends Vector2 {
   }
 
   static calcH(start: RoutePointNode, end: RoutePointNode) {
-    return (Math.abs(start.x - end.x) + Math.abs(start.y - end.y)) * 10;
-  }
-
-  getAround(space: number, routeType: RouteType) {
-    const bbox = new BBox2Factory().extend2(this).extend5(space).build();
-    const diagonal = () => [
-      new RoutePointNode(bbox.minX, bbox.minY),
-      new RoutePointNode(bbox.minX, bbox.maxY),
-      new RoutePointNode(bbox.maxX, bbox.maxY),
-      new RoutePointNode(bbox.maxX, bbox.minY),
-    ];
-
-    const orthometric = () => [
-      new RoutePointNode(bbox.minX, this.y),
-      new RoutePointNode(this.x, bbox.minY),
-      new RoutePointNode(bbox.maxX, this.y),
-      new RoutePointNode(this.x, bbox.maxY),
-    ]
-
-    switch (routeType) {
-      case RouteType.orthometric:
-        return orthometric();
-      case RouteType.diagonal:
-        return diagonal();
-      case RouteType.all:
-      default:
-        return [...orthometric(), ...diagonal()];
-    }
-
+    return Math.abs(start.x - end.x) + Math.abs(start.y - end.y)
   }
 
 }
@@ -105,11 +58,34 @@ const defaultSearchOption: Partial<SearchOption> = {
   routeType: RouteType.all,
 }
 
+class OpenListPriorityQueue extends AbstractPriorityQueue<RoutePointNode> {
+
+  pointKeyMap = new Map<string, RoutePointNode>()
+
+  constructor() {
+    super(comparator)
+  }
+
+  _insert = (pointNode: RoutePointNode) => {
+    this.pointKeyMap.set(pointNode.key, pointNode);
+  }
+
+  _poll = (pointNode: RoutePointNode) => {
+    this.pointKeyMap.delete(pointNode.key);
+  }
+
+  has(pointKey: string) {
+    return this.pointKeyMap.has(pointKey);
+  }
+
+  get(pointKey: string) {
+    return this.pointKeyMap.get(pointKey)
+  }
+}
+
 export class AStar implements SearchOption {
 
-  private readonly queue = new PriorityQueue<QueuePointNode>(QueuePointNode.comparator);
-
-  private readonly openList = new Map<string, RoutePointNode>();
+  private readonly openListQueue = new OpenListPriorityQueue();
 
   private readonly closeList = new Map<string, RoutePointNode>();
 
@@ -155,59 +131,101 @@ export class AStar implements SearchOption {
   }
 
   private _runOne(pointNode: RoutePointNode) {
-    const { end, step, routeType, openList } = this
-    const aroundPoints = pointNode.getAround(step, routeType).filter(node => this.canReach(node));
-    for (let i = 0; i < aroundPoints.length; i++) {
-      const pointDriving = aroundPoints[i];
-      const distance = pointDriving.distance2(end);
+    const { end, step } = this
+    let endNode: RoutePointNode | undefined;
+    this.traverseAroundPoints(pointNode, (aroundPoint, isFound) => {
+      const distance = aroundPoint.distance2(end);
       if (distance < step ** 2) {
-        pointDriving.parent = pointNode;
+        aroundPoint.parent = pointNode;
         if (distance === 0) {
-          return pointDriving;
+          endNode = aroundPoint;
+        } else {
+          end.parent = aroundPoint;
+          endNode = end;
         }
-        end.parent = pointDriving;
-        return end;
+        return true;
       }
-      if (!openList.has(pointDriving.key)) {
-        this.notFoundPointNode(pointNode, pointDriving)
+      if (isFound) {
+        this.foundPointNode(pointNode, aroundPoint)
       } else {
-        this.foundPointNode(pointNode, pointDriving);
+        this.notFoundPointNode(pointNode, aroundPoint);
       }
+    })
+    if (endNode) {
+      return endNode;
     }
-    openList.delete(pointNode.key);
+    this.openListQueue.delete(pointNode);
     this.closeList.set(pointNode.key, pointNode);
+
   }
 
+  traverseAroundPoints(ps: RoutePointNode, cb: (aroundPoint: RoutePointNode, isFound: boolean) => boolean | undefined) {
+    const bbox = new BBox2Factory().extend2(ps).extend5(this.step).build();
+
+    let arr!: [number, number][];
+
+    const diagonal = () => [
+      [bbox.minX, bbox.minY],
+      [bbox.minX, bbox.maxY],
+      [bbox.maxX, bbox.maxY],
+      [bbox.maxX, bbox.minY],
+    ] as typeof arr;
+    const orthometric = () => [
+      [bbox.minX, ps.y],
+      [ps.x, bbox.minY],
+      [bbox.maxX, ps.y],
+      [ps.x, bbox.maxY],
+    ] as typeof arr;
+
+    switch (this.routeType) {
+      case RouteType.orthometric:
+        arr = orthometric();
+        break;
+      case RouteType.diagonal:
+        arr = diagonal();
+        break;
+      case RouteType.all:
+      default:
+        arr = [...orthometric(), ...diagonal()];
+    }
+    arr.some(numArr => {
+      const aroundNode = this.openListQueue.get(numArr.join('|'));
+      const readlNode = aroundNode || new RoutePointNode(...numArr)
+      if (!this.canReach(readlNode)) {
+        return
+      }
+      return cb(readlNode, !!aroundNode);
+    })
+  }
 
   search() {
     if (!this.canSearch) {
       return EMPTY_ARRAY
     }
-    const { openList, queue } = this;
-    openList.set(this.start.key, this.start);
+    const { openListQueue: queue } = this;
     this.start.updateH(this.end);
-    queue.insert(new QueuePointNode(this.start));
-
+    queue.insert(this.start);
+    const resArr = []
     do {
       const minFQueueNodes = queue.poll();
       if (minFQueueNodes) {
+        // render(minFQueueNodes.map(i => i.value))
         for (const queueNode of minFQueueNodes) {
-          const endRoutePointNode = this._runOne(queueNode.node);
+          const endRoutePointNode = this._runOne(queueNode.value);
           if (endRoutePointNode) {
-            return this.getResult(endRoutePointNode);
+            resArr.push(this.getResult(endRoutePointNode))
+            return resArr;
           }
         }
       }
-    } while (openList.size);
+    } while (queue.size);
   }
 
   private notFoundPointNode(currentNode: RoutePointNode, nextNode: RoutePointNode) {
     nextNode.parent = currentNode;
     nextNode.updateG();
     nextNode.updateH(this.end);
-    nextNode.modCount++;
-    this.openList.set(nextNode.key, nextNode);
-    this.queue.insert(new QueuePointNode(nextNode));
+    this.openListQueue.insert(nextNode);
   }
 
   private foundPointNode(currentNode: RoutePointNode, nextNode: RoutePointNode) {
@@ -216,8 +234,7 @@ export class AStar implements SearchOption {
     if (newG < oldG) {
       nextNode.parent = currentNode;
       nextNode.updateG(newG);
-      nextNode.modCount++;
-      this.queue.insert(new QueuePointNode(nextNode));
+      this.openListQueue.insert(nextNode);
     }
   }
 
@@ -241,4 +258,21 @@ export class AStar implements SearchOption {
     }
     return true;
   }
+}
+
+let nodes: SVGElement[] = []
+function render(newPoints: any[]) {
+  const fragment = new DocumentFragment();
+  nodes.forEach(elm => elm.remove());
+  nodes.length = 0;
+  newPoints.forEach(ps => {
+    const elm: SVGCircleElement = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    elm.setAttribute('r', '8');
+    elm.setAttribute('cx', ps.x)
+    elm.setAttribute('cy', ps.y)
+    elm.style.fill = 'red';
+    fragment.appendChild(elm)
+  })
+  nodes.push(...Array.from(fragment.children) as any)
+  document.querySelector('svg')?.append(fragment)
 }

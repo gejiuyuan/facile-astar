@@ -230,16 +230,27 @@ export class DoublyLinkedListNode<T> {
 
 export class DoublyLinkedList<T> {
 
+  protected readonly map = new Map<T, DoublyLinkedListNode<T>>();
+
   head: DoublyLinkedListNode<T> | null = null;
 
   tail: DoublyLinkedListNode<T> | null = null;
+
+  get size() {
+    return this.map.size;
+  }
 
   constructor() {
 
   }
 
   insertBefore(node: DoublyLinkedListNode<T> | null, value: T) {
+    // 如果要插入的节点本身就存在此列表中，则需要先删除，再插入
+    if (this.map.has(value)) {
+      this.delete(value);
+    }
     const newNode = new DoublyLinkedListNode(value);
+    this.map.set(value, newNode);
     if (node === null) {
       if (this.head === node) {
         this.head = newNode;
@@ -261,7 +272,11 @@ export class DoublyLinkedList<T> {
   }
 
   insertAfter(node: DoublyLinkedListNode<T> | null, value: T) {
+    if (this.map.has(value)) {
+      this.delete(value);
+    }
     const newNode = new DoublyLinkedListNode(value);
+    this.map.set(value, newNode);
     if (node === null) {
       if (this.head === node) {
         this.head = newNode;
@@ -290,7 +305,16 @@ export class DoublyLinkedList<T> {
     return this.insertAfter(this.tail, value);
   }
 
-  delete(node: DoublyLinkedListNode<T>) {
+  delete(node: DoublyLinkedListNode<T> | T) {
+    if (!(node instanceof DoublyLinkedListNode)) {
+      const realNode = this.map.get(node);
+      if (!realNode) {
+        return;
+      }
+      node = realNode;
+    }
+    this.map.delete(node.value);
+
     if (node.next === null && node.previous === null) {
       this.head = null;
       this.tail = null;
@@ -349,12 +373,14 @@ export type Compute<T> = T extends Function ? T : { [k in keyof T]: T[k] }
 
 export type Item<T> = T extends { [k in keyof T]: infer V } ? V : never;
 
-export class PriorityQueue<T> extends DoublyLinkedList<T> {
+export abstract class AbstractPriorityQueue<T> extends DoublyLinkedList<T> {
   constructor(private readonly comparator: Item<Compute<Comparator<T>>>) {
     super();
   }
 
   insert(value: T) {
+    const { _insert } = this;
+    _insert && _insert(value);
     let currentNode = this.head;
     if (!currentNode) {
       return this.insertBefore(currentNode, value);
@@ -371,16 +397,21 @@ export class PriorityQueue<T> extends DoublyLinkedList<T> {
   poll() {
     let minPriorityNode = this.head;
     if (minPriorityNode) {
-      const res: T[] = [];
+      const { _poll } = this;
+      const res: DoublyLinkedListNode<T>[] = [];
       let currentNode = minPriorityNode;
       do {
-        res.push(currentNode.value);
+        res.push(currentNode);
         this.delete(currentNode);
+        _poll && _poll(currentNode.value);
       } while (currentNode.next && (currentNode = currentNode.next) && this.comparator(currentNode.value, minPriorityNode.value));
       return res;
     }
     return null;
   }
+
+  abstract _insert?: (value: T) => void;
+  abstract _poll?: (value: T) => void;
 }
 
 export class Comparator<T> {

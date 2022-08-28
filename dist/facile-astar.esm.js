@@ -188,11 +188,20 @@ class DoublyLinkedListNode {
 }
 class DoublyLinkedList {
     constructor() {
+        this.map = new Map();
         this.head = null;
         this.tail = null;
     }
+    get size() {
+        return this.map.size;
+    }
     insertBefore(node, value) {
+        // 如果要插入的节点本身就存在此列表中，则需要先删除，再插入
+        if (this.map.has(value)) {
+            this.delete(value);
+        }
         const newNode = new DoublyLinkedListNode(value);
+        this.map.set(value, newNode);
         if (node === null) {
             if (this.head === node) {
                 this.head = newNode;
@@ -214,7 +223,11 @@ class DoublyLinkedList {
         return newNode;
     }
     insertAfter(node, value) {
+        if (this.map.has(value)) {
+            this.delete(value);
+        }
         const newNode = new DoublyLinkedListNode(value);
+        this.map.set(value, newNode);
         if (node === null) {
             if (this.head === node) {
                 this.head = newNode;
@@ -242,6 +255,14 @@ class DoublyLinkedList {
         return this.insertAfter(this.tail, value);
     }
     delete(node) {
+        if (!(node instanceof DoublyLinkedListNode)) {
+            const realNode = this.map.get(node);
+            if (!realNode) {
+                return;
+            }
+            node = realNode;
+        }
+        this.map.delete(node.value);
         if (node.next === null && node.previous === null) {
             this.head = null;
             this.tail = null;
@@ -290,12 +311,14 @@ class DoublyLinkedList {
         return this;
     }
 }
-class PriorityQueue extends DoublyLinkedList {
+class AbstractPriorityQueue extends DoublyLinkedList {
     constructor(comparator) {
         super();
         this.comparator = comparator;
     }
     insert(value) {
+        const { _insert } = this;
+        _insert && _insert(value);
         let currentNode = this.head;
         if (!currentNode) {
             return this.insertBefore(currentNode, value);
@@ -311,11 +334,13 @@ class PriorityQueue extends DoublyLinkedList {
     poll() {
         let minPriorityNode = this.head;
         if (minPriorityNode) {
+            const { _poll } = this;
             const res = [];
             let currentNode = minPriorityNode;
             do {
-                res.push(currentNode.value);
+                res.push(currentNode);
                 this.delete(currentNode);
+                _poll && _poll(currentNode.value);
             } while (currentNode.next && (currentNode = currentNode.next) && this.comparator(currentNode.value, minPriorityNode.value));
             return res;
         }
@@ -352,23 +377,13 @@ function extend(obj1, obj2) {
 }
 const EMPTY_ARRAY = Object.freeze(new Array());
 
-class QueuePointNode {
-    constructor(node) {
-        this.node = node;
-        this.modCount = node.modCount;
-    }
-    noChanged() {
-        return this.modCount === this.node.modCount;
-    }
-}
-QueuePointNode.comparator = new Comparator((n1, n2) => n1.node.F - n2.node.F).lessOrEqualThan;
+const comparator = new Comparator((n1, n2) => n1.F - n2.F).lessOrEqualThan;
 class RoutePointNode extends Vector2 {
     constructor(x, y) {
         super(x, y);
         this.parent = null;
         this.G = 0;
         this.H = 0;
-        this.modCount = 0;
         this.key = `${x}|${y}`;
     }
     get F() {
@@ -385,31 +400,7 @@ class RoutePointNode extends Vector2 {
         return (node.x === mayBeParent.x || node.y === mayBeParent.y ? 10 : 14) + mayBeParent.G;
     }
     static calcH(start, end) {
-        return (Math.abs(start.x - end.x) + Math.abs(start.y - end.y)) * 10;
-    }
-    getAround(space, routeType) {
-        const bbox = new BBox2Factory().extend2(this).extend5(space).build();
-        const diagonal = () => [
-            new RoutePointNode(bbox.minX, bbox.minY),
-            new RoutePointNode(bbox.minX, bbox.maxY),
-            new RoutePointNode(bbox.maxX, bbox.maxY),
-            new RoutePointNode(bbox.maxX, bbox.minY),
-        ];
-        const orthometric = () => [
-            new RoutePointNode(bbox.minX, this.y),
-            new RoutePointNode(this.x, bbox.minY),
-            new RoutePointNode(bbox.maxX, this.y),
-            new RoutePointNode(this.x, bbox.maxY),
-        ];
-        switch (routeType) {
-            case RouteType.orthometric:
-                return orthometric();
-            case RouteType.diagonal:
-                return diagonal();
-            case RouteType.all:
-            default:
-                return [...orthometric(), ...diagonal()];
-        }
+        return Math.abs(start.x - end.x) + Math.abs(start.y - end.y);
     }
 }
 var RouteType;
@@ -422,10 +413,27 @@ const defaultSearchOption = {
     step: 10,
     routeType: RouteType.all,
 };
+class OpenListPriorityQueue extends AbstractPriorityQueue {
+    constructor() {
+        super(comparator);
+        this.pointKeyMap = new Map();
+        this._insert = (pointNode) => {
+            this.pointKeyMap.set(pointNode.key, pointNode);
+        };
+        this._poll = (pointNode) => {
+            this.pointKeyMap.delete(pointNode.key);
+        };
+    }
+    has(pointKey) {
+        return this.pointKeyMap.has(pointKey);
+    }
+    get(pointKey) {
+        return this.pointKeyMap.get(pointKey);
+    }
+}
 class AStar {
     constructor(option) {
-        this.queue = new PriorityQueue(QueuePointNode.comparator);
-        this.openList = new Map();
+        this.openListQueue = new OpenListPriorityQueue();
         this.closeList = new Map();
         this.canSearch = true;
         option.step ?? (option.step = defaultSearchOption.step);
@@ -449,56 +457,96 @@ class AStar {
         }
     }
     _runOne(pointNode) {
-        const { end, step, routeType, openList } = this;
-        const aroundPoints = pointNode.getAround(step, routeType).filter(node => this.canReach(node));
-        for (let i = 0; i < aroundPoints.length; i++) {
-            const pointDriving = aroundPoints[i];
-            const distance = pointDriving.distance2(end);
+        const { end, step } = this;
+        let endNode;
+        this.traverseAroundPoints(pointNode, (aroundPoint, isFound) => {
+            const distance = aroundPoint.distance2(end);
             if (distance < step ** 2) {
-                pointDriving.parent = pointNode;
+                aroundPoint.parent = pointNode;
                 if (distance === 0) {
-                    return pointDriving;
+                    endNode = aroundPoint;
                 }
-                end.parent = pointDriving;
-                return end;
+                else {
+                    end.parent = aroundPoint;
+                    endNode = end;
+                }
+                return true;
             }
-            if (!openList.has(pointDriving.key)) {
-                this.notFoundPointNode(pointNode, pointDriving);
+            if (isFound) {
+                this.foundPointNode(pointNode, aroundPoint);
             }
             else {
-                this.foundPointNode(pointNode, pointDriving);
+                this.notFoundPointNode(pointNode, aroundPoint);
             }
+        });
+        if (endNode) {
+            return endNode;
         }
-        openList.delete(pointNode.key);
+        this.openListQueue.delete(pointNode);
         this.closeList.set(pointNode.key, pointNode);
+    }
+    traverseAroundPoints(ps, cb) {
+        const bbox = new BBox2Factory().extend2(ps).extend5(this.step).build();
+        let arr;
+        const diagonal = () => [
+            [bbox.minX, bbox.minY],
+            [bbox.minX, bbox.maxY],
+            [bbox.maxX, bbox.maxY],
+            [bbox.maxX, bbox.minY],
+        ];
+        const orthometric = () => [
+            [bbox.minX, ps.y],
+            [ps.x, bbox.minY],
+            [bbox.maxX, ps.y],
+            [ps.x, bbox.maxY],
+        ];
+        switch (this.routeType) {
+            case RouteType.orthometric:
+                arr = orthometric();
+                break;
+            case RouteType.diagonal:
+                arr = diagonal();
+                break;
+            case RouteType.all:
+            default:
+                arr = [...orthometric(), ...diagonal()];
+        }
+        arr.some(numArr => {
+            const aroundNode = this.openListQueue.get(numArr.join('|'));
+            const readlNode = aroundNode || new RoutePointNode(...numArr);
+            if (!this.canReach(readlNode)) {
+                return;
+            }
+            return cb(readlNode, !!aroundNode);
+        });
     }
     search() {
         if (!this.canSearch) {
             return EMPTY_ARRAY;
         }
-        const { openList, queue } = this;
-        openList.set(this.start.key, this.start);
+        const { openListQueue: queue } = this;
         this.start.updateH(this.end);
-        queue.insert(new QueuePointNode(this.start));
+        queue.insert(this.start);
+        const resArr = [];
         do {
             const minFQueueNodes = queue.poll();
             if (minFQueueNodes) {
+                // render(minFQueueNodes.map(i => i.value))
                 for (const queueNode of minFQueueNodes) {
-                    const endRoutePointNode = this._runOne(queueNode.node);
+                    const endRoutePointNode = this._runOne(queueNode.value);
                     if (endRoutePointNode) {
-                        return this.getResult(endRoutePointNode);
+                        resArr.push(this.getResult(endRoutePointNode));
+                        return resArr;
                     }
                 }
             }
-        } while (openList.size);
+        } while (queue.size);
     }
     notFoundPointNode(currentNode, nextNode) {
         nextNode.parent = currentNode;
         nextNode.updateG();
         nextNode.updateH(this.end);
-        nextNode.modCount++;
-        this.openList.set(nextNode.key, nextNode);
-        this.queue.insert(new QueuePointNode(nextNode));
+        this.openListQueue.insert(nextNode);
     }
     foundPointNode(currentNode, nextNode) {
         const oldG = nextNode.G;
@@ -506,8 +554,7 @@ class AStar {
         if (newG < oldG) {
             nextNode.parent = currentNode;
             nextNode.updateG(newG);
-            nextNode.modCount++;
-            this.queue.insert(new QueuePointNode(nextNode));
+            this.openListQueue.insert(nextNode);
         }
     }
     getResult(point) {
@@ -531,4 +578,4 @@ class AStar {
     }
 }
 
-export { AStar, Angle, BBox2, BBox2Factory, Comparator, DoublyLinkedList, DoublyLinkedListNode, EMPTY_ARRAY, PriorityQueue, RoutePointNode, RouteType, Vector2, extend, isUndef };
+export { AStar, AbstractPriorityQueue, Angle, BBox2, BBox2Factory, Comparator, DoublyLinkedList, DoublyLinkedListNode, EMPTY_ARRAY, RoutePointNode, RouteType, Vector2, extend, isUndef };

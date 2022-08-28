@@ -59,14 +59,16 @@ declare class DoublyLinkedListNode<T> {
     constructor(value: T);
 }
 declare class DoublyLinkedList<T> {
+    protected readonly map: Map<T, DoublyLinkedListNode<T>>;
     head: DoublyLinkedListNode<T> | null;
     tail: DoublyLinkedListNode<T> | null;
+    get size(): number;
     constructor();
     insertBefore(node: DoublyLinkedListNode<T> | null, value: T): DoublyLinkedListNode<T>;
     insertAfter(node: DoublyLinkedListNode<T> | null, value: T): DoublyLinkedListNode<T>;
     shift(value: T): DoublyLinkedListNode<T>;
     push(value: T): DoublyLinkedListNode<T>;
-    delete(node: DoublyLinkedListNode<T>): void;
+    delete(node: DoublyLinkedListNode<T> | T): void;
     toArray(): DoublyLinkedListNode<T>[];
     fromArray(array: T[]): this;
     reverse(): this;
@@ -77,11 +79,13 @@ declare type Compute<T> = T extends Function ? T : {
 declare type Item<T> = T extends {
     [k in keyof T]: infer V;
 } ? V : never;
-declare class PriorityQueue<T> extends DoublyLinkedList<T> {
+declare abstract class AbstractPriorityQueue<T> extends DoublyLinkedList<T> {
     private readonly comparator;
     constructor(comparator: Item<Compute<Comparator<T>>>);
     insert(value: T): DoublyLinkedListNode<T>;
-    poll(): T[] | null;
+    poll(): DoublyLinkedListNode<T>[] | null;
+    abstract _insert?: (value: T) => void;
+    abstract _poll?: (value: T) => void;
 }
 declare class Comparator<T> {
     private readonly compareFunc;
@@ -101,13 +105,11 @@ declare class RoutePointNode extends Vector2 {
     get F(): number;
     G: number;
     H: number;
-    modCount: number;
     constructor(x: number, y: number);
     updateG(newG?: number): void;
     updateH(end: RoutePointNode): void;
     static calcG(node: RoutePointNode, mayBeParent: RoutePointNode): number;
     static calcH(start: RoutePointNode, end: RoutePointNode): number;
-    getAround(space: number, routeType: RouteType): RoutePointNode[];
 }
 declare enum RouteType {
     all = "all",
@@ -123,8 +125,7 @@ declare type SearchOption = {
     boundaryArea?: BBox2;
 };
 declare class AStar implements SearchOption {
-    private readonly queue;
-    private readonly openList;
+    private readonly openListQueue;
     private readonly closeList;
     canSearch: boolean;
     start: SearchOption['start'];
@@ -135,6 +136,7 @@ declare class AStar implements SearchOption {
     boundaryArea?: SearchOption['boundaryArea'];
     constructor(option: SearchOption);
     private _runOne;
+    traverseAroundPoints(ps: RoutePointNode, cb: (aroundPoint: RoutePointNode, isFound: boolean) => boolean | undefined): void;
     search(): any[] | undefined;
     private notFoundPointNode;
     private foundPointNode;
@@ -142,4 +144,4 @@ declare class AStar implements SearchOption {
     canReach(point: RoutePointNode): boolean;
 }
 
-export { AStar, Angle, BBox2, BBox2Factory, Comparator, Compute, DoublyLinkedList, DoublyLinkedListNode, EMPTY_ARRAY, Item, PriorityQueue, RoutePointNode, RouteType, SearchOption, Vector2, extend, isUndef };
+export { AStar, AbstractPriorityQueue, Angle, BBox2, BBox2Factory, Comparator, Compute, DoublyLinkedList, DoublyLinkedListNode, EMPTY_ARRAY, Item, RoutePointNode, RouteType, SearchOption, Vector2, extend, isUndef };
