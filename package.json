@@ -1,25 +1,37 @@
 {
-  "name": "facile-astar",
-  "version": "1.0.0",
-  "description": "",
-  "main": "dist/facile-astar.cjs.js",
-  "module": "dist/facile-astar.esm.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "npx tsc --noEmit && rollup --config",
-    "preview": "http-server -p 1008 -c-1 -o ./index.html"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "@rollup/plugin-commonjs": "^22.0.1",
-    "@rollup/plugin-json": "^4.1.0",
-    "@rollup/plugin-node-resolve": "^13.3.0",
-    "http-server": "^14.1.1",
-    "rollup": "^2.75.7",
-    "rollup-plugin-dts": "^4.2.2",
-    "rollup-plugin-terser": "^7.0.2",
-    "rollup-plugin-typescript2": "^0.32.1"
-  }
+	"name": "facile-astar",
+	"version": "1.0.0",
+	"description": "",
+	"type": "module",
+	"main": "dist/facile-astar.cjs.js",
+	"module": "dist/facile-astar.esm.js",
+	"types": "dist/index.d.ts",
+	"scripts": {
+		"build": "npx tsc --noEmit && rollup --config",
+		"dev": "npx ts-node --esm scripts/watch.ts"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"devDependencies": {
+		"@rollup/plugin-commonjs": "^22.0.1",
+		"@rollup/plugin-json": "^4.1.0",
+		"@rollup/plugin-node-resolve": "^13.3.0",
+		"@types/koa": "^2.13.9",
+		"@types/koa-bodyparser": "^4.3.10",
+		"@types/koa-router": "^7.4.5",
+		"@types/koa-static": "^4.0.2",
+		"@types/nodemon": "^1.19.3",
+		"koa": "^2.14.2",
+		"koa-bodyparser": "^4.4.1",
+		"koa-router": "^12.0.0",
+		"koa-static": "^5.0.0",
+		"nodemon": "^3.0.1",
+		"open": "^9.1.0",
+		"rollup": "^2.75.7",
+		"rollup-plugin-dts": "^4.2.2",
+		"rollup-plugin-terser": "^7.0.2",
+		"rollup-plugin-typescript2": "^0.32.1",
+		"ts-node": "^10.9.1"
+	}
 }

@@ -1,180 +1,186 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
-  <style>
-    :root {
-      font-size: 16px;
-    }
-    html,body {
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-    }
+	<head>
+		<meta charset="UTF-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Document</title>
+		<style>
+			:root {
+				font-size: 16px;
+			}
+			html,
+			body {
+				width: 100vw;
+				height: 100vh;
+				overflow: hidden;
+			}
 
-    svg {
-      width: 100%;
-      height: 100%;
-    }
-    *{
-      margin: 0;
-      padding: 0;
-    }
+			svg {
+				width: 100%;
+				height: 100%;
+			}
+			* {
+				margin: 0;
+				padding: 0;
+			}
 
-    button {
-      border: none;
-      outline: none;
-      position: fixed;
-      top: 10rem;
-      right: 14rem;
-      padding: 1rem;
-      background-color: red ;
-      color: #eee;
-      font-size: 16px;
-      font-weight: 500;
-      border-radius: 3px;
-      cursor: pointer;
-      transition: 0.1s ease-in-out;
-    }
+			button {
+				border: none;
+				outline: none;
+				position: fixed;
+				top: 10rem;
+				right: 14rem;
+				padding: 1rem;
+				background-color: red;
+				color: #eee;
+				font-size: 16px;
+				font-weight: 500;
+				border-radius: 3px;
+				cursor: pointer;
+				transition: 0.1s ease-in-out;
+			}
 
-    button:hover {
-      transform: translateY(-4px);
-      filter: drop-shadow(0 0 12px rgba(100,100,100,.3));
-    }
-  </style>
-</head>
-<body>
-  
-  <svg id="root" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <defs>
-      
-      <pattern id="grid" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
-        <rect width="40" height="40" fill="none" stroke="#ccc" stroke-width="0.6"></rect>
-      </pattern>
+			button:hover {
+				transform: translateY(-4px);
+				filter: drop-shadow(0 0 12px rgba(100, 100, 100, 0.3));
+			}
+		</style>
+	</head>
+	<body>
+		<svg id="root" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+			<defs>
+				<pattern id="grid" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+					<rect width="40" height="40" fill="none" stroke="#ccc" stroke-width="0.6"></rect>
+				</pattern>
+			</defs>
+			<rect id="gridBg" pointer-event="none" fill="url(#grid)"></rect>
+		</svg>
 
-    </defs>
-    <rect id="gridBg" pointer-event="none" fill="url(#grid)"></rect>
-    
-  </svg>
+		<button id="search-btn">查找路径</button>
+		<script type="module">
+			const updateSource = new EventSource("/update");
+			updateSource.addEventListener("open", () => {
+				console.log("sse connected");
+			});
+			updateSource.addEventListener("message", (msg) => {
+				console.log(msg, "更新了");
+				location.reload();
+			});
+		</script>
+		<script type="module">
+			import { AStar, RoutePointNode, BBox2 } from "./dist/facile-astar.esm.js";
 
-  <button id="search-btn">查找路径</button>
+			const svg = document.getElementById("root");
+			svg.setAttribute("fill", "cornSilk");
 
-  <script type="module">
-    import { AStar, RoutePointNode, BBox2 } from './dist/facile-astar.esm.js';
+			const createElm = (name) => document.createElementNS("http://www.w3.org/2000/svg", name);
 
-    const svg = document.getElementById('root'); 
-    svg.setAttribute('fill', 'cornSilk');
-    
-    const createElm = (name) => document.createElementNS('http://www.w3.org/2000/svg',name);
+			const gridRect = svg.querySelector("rect#gridBg");
+			gridRect.setAttribute("width", svg.width.baseVal.value);
+			gridRect.setAttribute("height", svg.height.baseVal.value);
 
-    const gridRect = svg.querySelector('rect#gridBg');
-    gridRect.setAttribute('width', svg.width.baseVal.value);
-    gridRect.setAttribute('height', svg.height.baseVal.value);
-     
+			let res = [];
+			let nodes = [];
+			let count = 1;
 
-    let res = [];
-    let nodes = []
-    let count = 1;
+			document.getElementById("root").addEventListener("click", (ev) => {
+				const { clientX, clientY } = ev;
+				const ps = new RoutePointNode(clientX, clientY);
+				if (blockArea.some((bbox) => bbox.isContain(ps))) {
+					return;
+				}
+				const i = ++count & 1;
+				res[i] = ps;
+				nodes[i]?.remove();
+				nodes[i] = syncPolylineAttr({
+					points: [ps, ps],
+				});
+				if (res.length === 2) {
+					document.getElementById("search-btn").click();
+				}
+			});
 
-    document.getElementById('root').addEventListener('click', (ev) => {
-      const {clientX, clientY} = ev;
-      const ps = new RoutePointNode(clientX, clientY);
-      if(blockArea.some(bbox => bbox.isContain(ps))) {
-        return;
-      }
-      const i = ++count & 1
-      res[i] = ps;
-      nodes[i]?.remove();
-      nodes[i] = syncPolylineAttr({
-        points: [ps,ps]
-      })
-      if(res.length === 2) {
-        document.getElementById('search-btn').click()
-      }
-    })
+			const blockArea = [
+				new BBox2(400, 680, 40, 200),
+				new BBox2(260, 560, 420, 560),
+				new BBox2(500, 660, 220, 360),
+				new BBox2(880, 1200, 400, 650),
+				new BBox2(700, 780, 440, 560),
+				new BBox2(940, 1080, 260, 360),
+			];
 
-    const blockArea = [
-      new BBox2(400, 680, 40, 200),
-      new BBox2(260, 560, 420, 560),
-      new BBox2(500, 660, 220, 360),
-      new BBox2(880, 1200, 400, 650),
-      new BBox2(700, 780, 440, 560),
-      new BBox2(940, 1080, 260, 360),
-    ]
- 
+			blockArea.forEach((bbox) => {
+				const rectElm = createElm("rect");
+				rectElm.setAttribute("x", bbox.minX);
+				rectElm.setAttribute("y", bbox.minY);
+				rectElm.setAttribute("width", bbox.maxX - bbox.minX);
+				rectElm.setAttribute("height", bbox.maxY - bbox.minY);
+				rectElm.setAttribute("fill", "cornflowerblue");
+				svg.append(rectElm);
+			});
 
-    blockArea.forEach(bbox => {
-      const rectElm = createElm('rect');
-      rectElm.setAttribute('x', bbox.minX);
-      rectElm.setAttribute('y', bbox.minY);
-      rectElm.setAttribute('width', bbox.maxX - bbox.minX);
-      rectElm.setAttribute('height', bbox.maxY - bbox.minY);
-      rectElm.setAttribute('fill', 'cornflowerblue')
-      svg.append(rectElm);
-    })
+			document.getElementById("search-btn").addEventListener("click", () => {
+				if (res.length < 2) {
+					return;
+				}
+				console.time("寻路时长");
+				const tool = new AStar({
+					start: res[0],
+					end: res[1],
+					blockArea,
+					// option: orthometric、diagonal、all
+					routeType: "orthometric",
+					step: 40,
+				});
+				window.tool = tool;
+				const ts = tool.search();
+				console.timeEnd("寻路时长");
 
-    document.getElementById('search-btn').addEventListener('click', () => {
-      if(res.length < 2) {
-        return
-      }
-      console.time('寻路时长')
-      const tool =  new AStar({
-        start: res[0],
-        end: res[1],
-        blockArea,
-        // option: orthometric、diagonal、all
-        routeType: 'orthometric',
-        step: 40,
-      });
-      window.tool = tool;
-      const ts = tool.search();
-      console.timeEnd('寻路时长')
-      
-      const className = 'searched-track';
-      let trackElm = svg.querySelector('.' + className)
-      if(!trackElm) {
-        trackElm = syncPolylineAttr({
-          points: [],
-          stroke: 'green',
-          className
-        })
-      }
+				const className = "searched-track";
+				let trackElm = svg.querySelector("." + className);
+				if (!trackElm) {
+					trackElm = syncPolylineAttr({
+						points: [],
+						stroke: "green",
+						className,
+					});
+				}
 
-      nodes[0].before(trackElm);
-      nodes[1].before(nodes[0]); 
-      loopSetTrack(ts.shift(), 0)
-      function loopSetTrack(arr, count) {
-        setTimeout(() => {
-          trackElm.setAttribute('points', arr.slice(0, count++).map(ps => [...ps].join(' ')).join(' '))
-          if(count <= arr.length) {
-            loopSetTrack(arr, count);
-          } else if(ts.length){
-            loopSetTrack(ts.shift(), 0)
-          }
-        }, 40);
-      }
-      
-    })
+				nodes[0].before(trackElm);
+				nodes[1].before(nodes[0]);
+				loopSetTrack(ts.shift(), 0);
+				function loopSetTrack(arr, count) {
+					setTimeout(() => {
+						trackElm.setAttribute(
+							"points",
+							arr
+								.slice(0, count++)
+								.map((ps) => [...ps].join(" "))
+								.join(" "),
+						);
+						if (count <= arr.length) {
+							loopSetTrack(arr, count);
+						} else if (ts.length) {
+							loopSetTrack(ts.shift(), 0);
+						}
+					}, 40);
+				}
+			});
 
-    
-    
-
-    function syncPolylineAttr(ops) {
-      const elm = createElm('polyline')
-      ops.className && (ops.className.split(' ').forEach(content => elm.classList.add(content)));
-      elm.setAttribute('points', [...ops.points].map(ps => [...ps].join(' ')).join(' '));
-      elm.setAttribute('fill', "none");
-      elm.setAttribute("stroke", ops.stroke || "#ff9933");
-      elm.setAttribute('stroke-width', 20);
-      elm.setAttribute('stroke-dasharray', 0);
-      elm.setAttribute('stroke-linejoin', 'round');
-      elm.setAttribute('stroke-linecap', 'round');
-      svg.appendChild(elm)
-      return elm;
-    }
-  </script>
-</body>
+			function syncPolylineAttr(ops) {
+				const elm = createElm("polyline");
+				ops.className && ops.className.split(" ").forEach((content) => elm.classList.add(content));
+				elm.setAttribute("points", [...ops.points].map((ps) => [...ps].join(" ")).join(" "));
+				elm.setAttribute("fill", "none");
+				elm.setAttribute("stroke", ops.stroke || "#ff9933");
+				elm.setAttribute("stroke-width", 20);
+				elm.setAttribute("stroke-dasharray", 0);
+				elm.setAttribute("stroke-linejoin", "round");
+				elm.setAttribute("stroke-linecap", "round");
+				svg.appendChild(elm);
+				return elm;
+			}
+		</script>
+	</body>
 </html>
